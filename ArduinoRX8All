@@ -1,0 +1,469 @@
+#include <Arduino.h>
+#include <U8g2lib.h>
+#include <Arduino_CAN.h>
+#include <ArduinoBLE.h>
+#include <Wire.h>
+
+// https://github.com/aollin/racechrono-ble-diy-device
+BLEService batteryService("00001ff8-0000-1000-8000-00805f9b34fb");
+
+BLECharacteristic canBusMainCharacteristic("00000001-0000-1000-8000-00805f9b34fb", BLERead | BLENotify, 20, false);
+BLEUnsignedLongCharacteristic canBusFilterCharacteristic("00000002-0000-1000-8000-00805f9b34fb", BLEWrite);
+
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+
+uint8_t tempData[20];
+
+void setup(void) {
+  analogReadResolution(14);
+
+  Serial.begin(1000000);
+  while (!Serial) {}
+
+  if (!CAN.begin(CanBitRate::BR_500k)) {
+    Serial.println("CAN.begin(...) failed.");
+    for (;;) {}
+  }
+
+
+  if (!BLE.begin()) {
+    Serial.println("starting BLE failed!");
+    for (;;) {}
+  }
+
+  BLE.setLocalName("RC DIY #0000");
+  BLE.setAdvertisedService(batteryService);
+  batteryService.addCharacteristic(canBusMainCharacteristic);
+  batteryService.addCharacteristic(canBusFilterCharacteristic);
+  BLE.addService(batteryService);
+
+  canBusMainCharacteristic.writeValue(tempData, 5);
+
+  BLE.advertise();
+
+  Serial.println("Bluetooth® device active, waiting for connections...");
+
+
+
+  u8g2.setI2CAddress(0x7A);
+  u8g2.setBusClock(100000);
+  u8g2_2.setI2CAddress(0x78);
+  u8g2_2.setBusClock(100000);
+
+  u8g2.begin();
+  u8g2_2.begin();
+}
+
+
+
+void loop(void) {
+  updateAnalogData();
+  checkCAN();
+  sendViaBluetooth();
+  drawDisplays();
+  delay(40);
+}
+
+
+
+
+
+#define BUFFER_SIZE 51
+
+int measurements[BUFFER_SIZE];
+int measurementCount = 0;
+
+void clearBuffer() {
+  measurementCount = 0;
+}
+
+void insertIntoSortedArray(int arr[], int *size, int element) {
+  int i = *size - 1;
+  while (i >= 0 && arr[i] > element) {
+    arr[i + 1] = arr[i];
+    i--;
+  }
+  arr[i + 1] = element;
+  (*size)++;
+}
+
+void insertMeasurement(int measurement) {
+  insertIntoSortedArray(measurements, &measurementCount, measurement);
+}
+
+int getMedian() {
+  if (measurementCount % 2 == 0) {
+    return (measurements[measurementCount / 2] + measurements[measurementCount / 2 - 1]) / 2;
+  } else {
+    return measurements[measurementCount / 2];
+  }
+}
+
+const float VCC = 4.67;
+
+long t2 = 0;
+float brakePressure = 0;
+float oilPressure = 0;
+float oilTemperature = 0;
+void updateAnalogData() {
+  long t2Start = micros();
+  int i;
+
+  clearBuffer();
+  for (i = 0; i < BUFFER_SIZE; i++) {
+    insertMeasurement(analogRead(A0) - analogRead(A1));
+  }
+
+   brakePressure = (getMedian() * VCC / 16383.0 - 0.5) / 0.027;
+
+  clearBuffer();
+  for (i = 0; i < BUFFER_SIZE; i++) {
+    insertMeasurement(analogRead(A2));
+  }
+
+   oilPressure = (getMedian() * VCC / 16383.0 - 0.5) / 0.4;
+
+  clearBuffer();
+  for (i = 0; i < BUFFER_SIZE; i++) {
+    insertMeasurement(analogRead(A3));
+  }
+
+  float V2 = getMedian() * VCC / 16383.0;
+  float lnR2 = log(V2 * 330.0 / (VCC - V2));
+   oilTemperature = 1.0 / (1.294333144e-3 + 2.602193987e-4 * lnR2 + 1.738527465e-7 * lnR2 * lnR2 * lnR2) - 273.15;
+
+  t2 = micros() - t2Start;
+}
+
+
+
+
+long previousMillis = 0;
+long val = 0;
+void sendViaBluetooth() {
+
+  BLEDevice central = BLE.central();
+
+  if (central) {
+    while (central.connected()) {
+      long currentMillis = micros();
+      if (currentMillis - previousMillis >= 48000) {
+        long start = micros();
+        previousMillis = currentMillis;
+
+        ((uint32_t *)tempData)[0] = 0x0000ff01;
+        tempData[4] = (val >> 16) & 0xff;
+        tempData[5] = (val >> 8) & 0xff;
+        tempData[6] = val & 0xff;
+
+
+        canBusMainCharacteristic.writeValue(tempData, 20, false);
+
+
+
+          if (micros() % 3 == 0) {
+            delay(5);
+            ((uint32_t *)tempData)[0] = 0x0000ff02;
+            tempData[4] = (val >> 24) & 0xff;
+            tempData[5] = (val >> 16) & 0xff;
+            tempData[6] = (val >> 8) & 0xff;
+            tempData[7] = val & 0xff;
+
+            canBusMainCharacteristic.writeValue(tempData, 20, false);
+            val = micros() - start;
+            delay(5);
+          }
+      } else if (currentMillis - previousMillis < 20000) {
+        long start = micros();
+        drawDisplays();
+        val = micros() - start;
+      }
+    }
+  }
+}
+
+
+
+
+
+
+bool needAsk = true;
+long askTime = 0;
+long startAsk = 0;
+
+long startTime = 0;
+long count = 0;
+
+/*
+
+  mafAirFlowRatio = OBD2.pidRead(16);  0x10  ((A * 256.0 + B) / 100.0);
+  egt = OBD2.pidRead(60);              0x3c  (((A * 256.0 + B) / 10.0) - 40.0);
+  voltage = OBD2.pidRead(66);          0x42  ((A * 256.0 + B) / 1000.0);
+  afr = OBD2.pidRead(68) * 14.6412885; 0x44  (2.0 * (A * 256.0 + B) / 65536.0);
+  
+  intakeAirTemperature = OBD2.pidRead(15); 0xf  (A - 40.0);
+
+0081 - 100Hz
+0201 - 62Hz
+0212 - 50Hz
+0420
+04B0 - 50Hz
+*/
+void checkCAN() {
+  if (startTime == 0) {
+    startTime = millis();
+  }
+  if (CAN.available()) {
+    CanMsg const msg1 = CAN.read();
+    if (msg1.id != 0x81) { return; }
+    count++;
+
+    if (millis() - askTime > 1000) {
+      Serial.print(count);
+      Serial.print(" ");
+      Serial.println((count * 1000.0) / (millis() - startTime));
+      askTime = millis();
+    }
+  }
+  delay(40);
+
+
+
+  return;
+
+  if (needAsk || millis() - askTime > 2000) {
+    startAsk = micros();
+    uint8_t const msg_data[] = { 0x02, 0x01, 0x0C, 0, 0, 0, 0, 0 };
+    CanMsg const msg(CanStandardId(0x7df), sizeof(msg_data), msg_data);
+
+    if (int const rc = CAN.write(msg); rc < 0) {
+      Serial.print("CAN.write(...) failed with error code ");
+      Serial.println(rc);
+      for (;;) {}
+    }
+
+    needAsk = false;
+    askTime = millis();
+  }
+
+  long start = micros();
+  if (CAN.available()) {
+    CanMsg const msg1 = CAN.read();
+
+    if (msg1.data[1] == 0x41 && msg1.data[2] == 0x0C) {
+      Serial.print(msg1);
+      Serial.print("  ");
+      Serial.print((msg1.data[3] * 256.0 + msg1.data[4]) / 4.0);
+      Serial.print("  ");
+      Serial.print(micros() - startAsk);
+      Serial.print("  ");
+      Serial.println(micros() - start);
+
+      delay(1000);
+      needAsk = true;
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+long t = 0;
+long state = 0;
+void drawDisplays(void) {
+  long start = micros();
+  switch (state) {
+    case 0:
+      u8g2.clearBuffer();
+      u8g2.setCursor(0, 32);
+      u8g2.setFont(u8g2_font_logisoso22_tn);
+      u8g2.print(oilTemperature, 1);
+
+      u8g2.setCursor(0, 7);
+      u8g2.setFont(u8g2_font_6x10_tf);
+      u8g2.print("Oil T");
+
+      u8g2.updateDisplayArea(0, 0, 8, 1);
+      t = micros() - start;
+      break;
+    case 1:
+      u8g2.updateDisplayArea(0, 1, 8, 1);
+      break;
+    case 2:
+      u8g2.updateDisplayArea(0, 2, 8, 1);
+      break;
+    case 3:
+      u8g2.updateDisplayArea(0, 3, 8, 1);
+      break;
+
+    case 4:
+      u8g2.setCursor(64, 32);
+      u8g2.setFont(u8g2_font_logisoso22_tn);
+      if (t < 10000) {
+        u8g2.print(" ");
+      }
+      u8g2.print(t / 100.0, 1);
+
+      u8g2.setCursor(89, 7);
+      u8g2.setFont(u8g2_font_6x10_tf);
+      u8g2.print("Coolant");
+
+      u8g2.updateDisplayArea(8, 0, 8, 1);
+      break;
+    case 5:
+      u8g2.updateDisplayArea(8, 1, 8, 1);
+      break;
+    case 6:
+      u8g2.updateDisplayArea(8, 2, 8, 1);
+      break;
+    case 7:
+      u8g2.updateDisplayArea(8, 3, 8, 1);
+      break;
+
+    case 8:
+      u8g2.setCursor(0, 56);
+      u8g2.setFont(u8g2_font_logisoso22_tn);
+      u8g2.print(oilPressure, 1);
+
+      u8g2.setCursor(0, 64);
+      u8g2.setFont(u8g2_font_6x10_tf);
+      u8g2.print("Oil P");
+
+      u8g2.updateDisplayArea(0, 4, 8, 1);
+      break;
+    case 9:
+      u8g2.updateDisplayArea(0, 5, 8, 1);
+      break;
+    case 10:
+      u8g2.updateDisplayArea(0, 6, 8, 1);
+      break;
+    case 11:
+      u8g2.updateDisplayArea(0, 7, 8, 1);
+      break;
+
+    case 12:
+      u8g2.setCursor(64, 56);
+      u8g2.setFont(u8g2_font_logisoso22_tn);
+
+      char buffer[10];
+      dtostrf(brakePressure, 5, 1, buffer);
+
+      u8g2.print(buffer);
+
+      u8g2.setCursor(94, 64);
+      u8g2.setFont(u8g2_font_6x10_tf);
+      u8g2.print("Intake");
+
+      u8g2.updateDisplayArea(8, 4, 8, 1);
+      break;
+    case 13:
+      u8g2.updateDisplayArea(8, 5, 8, 1);
+      break;
+    case 14:
+      u8g2.updateDisplayArea(8, 6, 8, 1);
+      break;
+    case 15:
+      u8g2.updateDisplayArea(8, 7, 8, 1);
+      break;
+
+    case 16:
+      u8g2_2.clearBuffer();
+      u8g2_2.setCursor(0, 32);
+      u8g2_2.setFont(u8g2_font_logisoso22_tn);
+      u8g2_2.print(t / 100.0, 1);
+
+      u8g2_2.setCursor(0, 7);
+      u8g2_2.setFont(u8g2_font_6x10_tf);
+      u8g2_2.print("Voltage");
+
+      u8g2_2.updateDisplayArea(0, 0, 8, 1);
+      break;
+    case 17:
+      u8g2_2.updateDisplayArea(0, 1, 8, 1);
+      break;
+    case 18:
+      u8g2_2.updateDisplayArea(0, 2, 8, 1);
+      break;
+    case 19:
+      u8g2_2.updateDisplayArea(0, 3, 8, 1);
+      break;
+
+    case 20:
+      u8g2_2.setCursor(64, 32);
+      u8g2_2.setFont(u8g2_font_logisoso22_tn);
+      if (t < 10000) {
+        u8g2_2.print(" ");
+      }
+      u8g2_2.print(t / 100.0, 1);
+
+      u8g2_2.setCursor(110, 7);
+      u8g2_2.setFont(u8g2_font_6x10_tf);
+      u8g2_2.print("EGT");
+
+      u8g2_2.updateDisplayArea(8, 0, 8, 1);
+      break;
+    case 21:
+      u8g2_2.updateDisplayArea(8, 1, 8, 1);
+      break;
+    case 22:
+      u8g2_2.updateDisplayArea(8, 2, 8, 1);
+      break;
+    case 23:
+      u8g2_2.updateDisplayArea(8, 3, 8, 1);
+      break;
+    case 24:
+      u8g2_2.setCursor(0, 56);
+      u8g2_2.setFont(u8g2_font_logisoso22_tn);
+      u8g2_2.print(t / 1000.0, 1);
+
+      u8g2_2.setCursor(0, 64);
+      u8g2_2.setFont(u8g2_font_6x10_tf);
+      u8g2_2.print("MAF");
+
+      u8g2_2.updateDisplayArea(0, 4, 8, 1);
+      break;
+    case 25:
+      u8g2_2.updateDisplayArea(0, 5, 8, 1);
+      break;
+    case 26:
+      u8g2_2.updateDisplayArea(0, 6, 8, 1);
+      break;
+    case 27:
+      u8g2_2.updateDisplayArea(0, 7, 8, 1);
+      break;
+
+    case 28:
+      u8g2_2.setCursor(64, 56);
+      u8g2_2.setFont(u8g2_font_logisoso22_tn);
+
+      dtostrf(t / 1000.0, 5, 1, buffer);
+
+      u8g2_2.print(buffer);
+
+      u8g2_2.setCursor(110, 64);
+      u8g2_2.setFont(u8g2_font_6x10_tf);
+      u8g2_2.print("AFR");
+
+      u8g2_2.updateDisplayArea(8, 4, 8, 1);
+      break;
+    case 29:
+      u8g2_2.updateDisplayArea(8, 5, 8, 1);
+      break;
+    case 30:
+      u8g2_2.updateDisplayArea(8, 6, 8, 1);
+      break;
+    case 31:
+      u8g2_2.updateDisplayArea(8, 7, 8, 1);
+      state = -1;
+      break;
+  }
+  t = micros() - start + state * 100;
+
+  state++;
+}
