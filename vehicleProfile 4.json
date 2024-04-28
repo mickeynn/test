@@ -1,0 +1,157 @@
+{
+  "info": [
+    {
+      "value": "Mazda",
+      "infoId": 1
+    },
+    {
+      "value": "RX-8",
+      "infoId": 2
+    },
+    {
+      "value": "2004",
+      "infoId": 5
+    },
+    {
+      "value": "1300",
+      "infoId": 6
+    },
+    {
+      "value": "231",
+      "infoId": 7
+    },
+    {
+      "value": "car",
+      "infoId": 8
+    }
+  ],
+  "obdDefaultHeader": 0,
+  "obdProtocol": 0,
+  "selectedChannels": [
+    {
+      "deviceType": 5,
+      "channelIds": [
+        10026,
+        10029
+      ],
+      "priority": 1
+    },
+    {
+      "deviceType": 5,
+      "channelIds": [
+        10071,
+        10024
+      ],
+      "priority": 2
+    }
+  ],
+  "localUuid": "8794e3a8665685c5008e99bd5dbb9d7fff9685acdca0813283096c8ef0bb0713",
+  "obdNonStandard": false,
+  "customChannels": [
+    {
+      "pid": 513,
+      "equation": "(bytesToUint(raw,4,2)-10000)\/360",
+      "obdHeader": 0,
+      "channelId": 4,
+      "deviceType": 12
+    },
+    {
+      "pid": 513,
+      "equation": "bytesToUint(raw,0,2)\/4",
+      "obdHeader": 0,
+      "channelId": 10024,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToInt(raw,0,3)",
+      "obdHeader": 0,
+      "channelId": 5000,
+      "deviceType": 12
+    },
+    {
+      "pid": 129,
+      "equation": "bytesToInt(raw,2,2)",
+      "obdHeader": 0,
+      "channelId": 1001,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToInt(raw,0,2)",
+      "obdHeader": 0,
+      "channelId": 1033,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToUint(raw,0,4)",
+      "obdHeader": 0,
+      "channelId": 5001,
+      "deviceType": 12
+    },
+    {
+      "pid": 530,
+      "equation": "bitsToUint(raw,44,1)*100",
+      "obdHeader": 0,
+      "channelId": 1002,
+      "deviceType": 12
+    },
+    {
+      "pid": 1056,
+      "equation": "bytesToUint(raw,0,1)-40",
+      "obdHeader": 0,
+      "channelId": 10026,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToInt(raw,2,2)",
+      "obdHeader": 0,
+      "channelId": 1007,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToInt(raw,4,2)\/100",
+      "obdHeader": 0,
+      "channelId": 10066,
+      "deviceType": 12
+    },
+    {
+      "pid": 1200,
+      "equation": "(bytesToUint(raw,0,2)-10000)\/360",
+      "obdHeader": 0,
+      "channelId": 197623,
+      "deviceType": 12
+    },
+    {
+      "pid": 1200,
+      "equation": "(bytesToUint(raw,4,2)-10000)\/360",
+      "obdHeader": 0,
+      "channelId": 132087,
+      "deviceType": 12
+    },
+    {
+      "pid": 1200,
+      "equation": "(bytesToUint(raw,2,2)-10000)\/360",
+      "obdHeader": 0,
+      "channelId": 164855,
+      "deviceType": 12
+    },
+    {
+      "pid": 1200,
+      "equation": "(bytesToUint(raw,6,2)-10000)\/360",
+      "obdHeader": 0,
+      "channelId": 99319,
+      "deviceType": 12
+    },
+    {
+      "pid": 513,
+      "equation": "bytesToUint(raw,6,1)\/2",
+      "obdHeader": 0,
+      "channelId": 10071,
+      "deviceType": 12
+    }
+  ]
+}

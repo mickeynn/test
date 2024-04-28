@@ -1,0 +1,178 @@
+{
+  "info": [
+    {
+      "value": "Mazda",
+      "infoId": 1
+    },
+    {
+      "value": "RX-8 Arduino",
+      "infoId": 2
+    },
+    {
+      "value": "2004",
+      "infoId": 5
+    },
+    {
+      "value": "1300",
+      "infoId": 6
+    },
+    {
+      "value": "231",
+      "infoId": 7
+    },
+    {
+      "value": "car",
+      "infoId": 8
+    }
+  ],
+  "obdDefaultHeader": 0,
+  "obdProtocol": 0,
+  "selectedChannels": [
+    {
+      "deviceType": 5,
+      "channelIds": [
+        10026,
+        10029
+      ],
+      "priority": 1
+    },
+    {
+      "deviceType": 5,
+      "channelIds": [
+        10071,
+        10024
+      ],
+      "priority": 2
+    }
+  ],
+  "localUuid": "04d2dac11759315493897c0e754449e97b347f4a0f018e51304177d4aefdca63",
+  "obdNonStandard": false,
+  "customChannels": [
+    {
+      "pid": 65281,
+      "equation": "(bytesToUint(raw,4,2)-10000.0)\/360.0",
+      "obdHeader": 0,
+      "channelId": 4,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToUint(raw,2,2)\/4.0",
+      "obdHeader": 0,
+      "channelId": 10024,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToInt(raw,0,2)",
+      "obdHeader": 0,
+      "channelId": 1001,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToUint(raw,10,2)",
+      "obdHeader": 0,
+      "channelId": 1033,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToUint(raw,0,1)-40",
+      "obdHeader": 0,
+      "channelId": 10026,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bitsToUint(raw,60,1)*100.0",
+      "obdHeader": 0,
+      "channelId": 1002,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToUint(raw,9,1)-40",
+      "obdHeader": 0,
+      "channelId": 10029,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToInt(raw,1,2)\/100.0",
+      "obdHeader": 0,
+      "channelId": 10030,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToUint(raw,12,2)",
+      "obdHeader": 0,
+      "channelId": 1007,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToInt(raw,3,2)\/10.0-40.0",
+      "obdHeader": 0,
+      "channelId": 1041,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToUint(raw,14,2)\/100.0",
+      "obdHeader": 0,
+      "channelId": 10066,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "bytesToInt(raw,5,2)\/1000.0",
+      "obdHeader": 0,
+      "channelId": 1043,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "(bytesToUint(raw,8,2)-10000.0)\/360.0",
+      "obdHeader": 0,
+      "channelId": 197623,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "(bytesToUint(raw,12,2)-10000.0)\/360.0",
+      "obdHeader": 0,
+      "channelId": 132087,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "(bytesToUint(raw,10,2)-10000.0)\/360.0",
+      "obdHeader": 0,
+      "channelId": 164855,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "(bytesToUint(raw,14,2)-10000.0)\/360.0",
+      "obdHeader": 0,
+      "channelId": 99319,
+      "deviceType": 12
+    },
+    {
+      "pid": 65281,
+      "equation": "bytesToUint(raw,6,1)\/2.0",
+      "obdHeader": 0,
+      "channelId": 10071,
+      "deviceType": 12
+    },
+    {
+      "pid": 65282,
+      "equation": "2*bytesToUint(raw,7,2)\/65536.0",
+      "obdHeader": 0,
+      "channelId": 1023,
+      "deviceType": 12
+    }
+  ]
+}
