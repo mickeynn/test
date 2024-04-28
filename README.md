@@ -18,14 +18,22 @@ Hardware:
 
 Useful links:
 https://github.com/olikraus/u8g2/blob/master/sys/arduino/u8g2_full_buffer/UpdateArea/UpdateArea.ino
+
 https://github.com/MagnusThome/esp32_obd2/blob/master/src/esp32_obd2.cpp
+
 https://github.com/sandeepmistry/arduino-OBD2/blob/master/src/OBD2.h
+
 https://github.com/arduino/ArduinoCore-renesas/tree/b5a3b9dee4c659e6ee173f5eb4143c0e021ed6c3/libraries/Arduino_CAN/src
+
 https://github.com/DaveBlackH/MazdaRX8Arduino
+
 https://github.com/Radivv/arduino-display-obd2-can-mazda-rx8
+
 https://docs.arduino.cc/tutorials/uno-r4-wifi/can/
 
+
 patch timeout here:
+
 /Users/n.mikolaichuk/Library/Arduino15/packages/arduino/hardware/renesas_uno/1.1.0/libraries/Wire/Wire.cpp
 ```
 TwoWire::TwoWire(int scl, int sda, WireAddressMode_t am /*= ADDRESS_MODE_7_BITS*/, bool prefer_sci /*= false*/) :
