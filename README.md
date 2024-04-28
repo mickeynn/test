@@ -17,6 +17,7 @@ Hardware:
 
 
 Useful links:
+
 https://github.com/olikraus/u8g2/blob/master/sys/arduino/u8g2_full_buffer/UpdateArea/UpdateArea.ino
 
 https://github.com/MagnusThome/esp32_obd2/blob/master/src/esp32_obd2.cpp
