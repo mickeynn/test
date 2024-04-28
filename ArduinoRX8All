@@ -16,7 +16,24 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
 uint8_t tempData[20];
 uint8_t tempData2[20];
 
+#define LED_PIN_1 9
+#define LED_PIN_2 6
+#define LED_PIN_3 5
+
+
+
+
+int     buttonState = 0;
+
+
 void setup(void) {
+
+    pinMode(LED_PIN_1, OUTPUT);
+  pinMode(LED_PIN_2, OUTPUT);
+  pinMode(LED_PIN_3, OUTPUT);
+
+pinMode(4, INPUT);
+
   analogReadResolution(14);
 
   Serial.begin(1000000);
@@ -49,9 +66,9 @@ void setup(void) {
 
 
   u8g2.setI2CAddress(0x7A);
-  u8g2.setBusClock(100000);
+  u8g2.setBusClock(400000);
   u8g2_2.setI2CAddress(0x78);
-  u8g2_2.setBusClock(100000);
+  u8g2_2.setBusClock(400000);
 
   u8g2.begin();
   u8g2_2.begin();
@@ -60,6 +77,29 @@ void setup(void) {
 
 
 void loop(void) {
+// digitalWrite(LED_PIN_1, HIGH);
+  digitalWrite(LED_PIN_2, LOW);
+  digitalWrite(LED_PIN_3, LOW);
+
+  buttonState = digitalRead(4);
+
+  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
+  if (buttonState == HIGH) {    
+    digitalWrite(LED_PIN_1, HIGH);
+      digitalWrite(LED_PIN_2, HIGH);
+  digitalWrite(LED_PIN_3, HIGH);
+  pinMode(3, OUTPUT);
+    tone(3,550);
+
+  } else {
+digitalWrite(LED_PIN_1, LOW);
+  digitalWrite(LED_PIN_2, LOW);
+  digitalWrite(LED_PIN_3, LOW);
+// noTone(3);
+pinMode(3, INPUT);
+// digitalWrite(3, HIGH);
+  }
+
   for (int i = 0; i < 30; i++) {
     checkCAN();
   }
