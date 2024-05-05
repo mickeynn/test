@@ -10,29 +10,25 @@ BLEService batteryService("00001ff8-0000-1000-8000-00805f9b34fb");
 BLECharacteristic canBusMainCharacteristic("00000001-0000-1000-8000-00805f9b34fb", BLERead | BLENotify, 20, false);
 BLEUnsignedLongCharacteristic canBusFilterCharacteristic("00000002-0000-1000-8000-00805f9b34fb", BLEWrite);
 
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
-U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2_2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C *u8g2;
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C *u8g2_2;
 
 uint8_t tempData[20];
 uint8_t tempData2[20];
 
-#define LED_PIN_1 9
-#define LED_PIN_2 6
-#define LED_PIN_3 5
+#define LED_PIN_RED 9
+#define LED_PIN_GREEN 6
+#define LED_PIN_YELLOW 5
 
-
-
-
-int     buttonState = 0;
+int buttonState = 0;
 
 
 void setup(void) {
+  pinMode(LED_PIN_RED, OUTPUT);
+  pinMode(LED_PIN_GREEN, OUTPUT);
+  pinMode(LED_PIN_YELLOW, OUTPUT);
 
-    pinMode(LED_PIN_1, OUTPUT);
-  pinMode(LED_PIN_2, OUTPUT);
-  pinMode(LED_PIN_3, OUTPUT);
-
-pinMode(4, INPUT);
+  pinMode(4, INPUT);
 
   analogReadResolution(14);
 
@@ -43,7 +39,6 @@ pinMode(4, INPUT);
     Serial.println("CAN.begin(...) failed.");
     for (;;) {}
   }
-
 
   if (!BLE.begin()) {
     Serial.println("starting BLE failed!");
@@ -63,53 +58,52 @@ pinMode(4, INPUT);
 
   Serial.println("Bluetooth® device active, waiting for connections...");
 
+  u8g2 = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+  u8g2->setI2CAddress(0x7A);
+  u8g2->setBusClock(400000);
+  u8g2->begin();
 
+  u8g2_2 = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
+  u8g2_2->setI2CAddress(0x78);
+  u8g2_2->setBusClock(400000);
+  u8g2_2->begin();
+}
 
-  u8g2.setI2CAddress(0x7A);
-  u8g2.setBusClock(400000);
-  u8g2_2.setI2CAddress(0x78);
-  u8g2_2.setBusClock(400000);
+int mode = 0;
+int canChangeMode = true;
+int checkSeconds = true;
 
-  u8g2.begin();
-  u8g2_2.begin();
+void checkButton(void) {
+  buttonState = digitalRead(4);
+  if (buttonState == HIGH) {
+    if (canChangeMode) {
+      mode ^= 1;
+      canChangeMode = false;
+      checkSeconds = false;
+    }
+  } else {
+    canChangeMode = true;
+  }
+
+  if (checkSeconds && millis() > 15000) {
+    checkSeconds = false;
+    mode = 1;
+  }
 }
 
 
-
 void loop(void) {
-// digitalWrite(LED_PIN_1, HIGH);
-  digitalWrite(LED_PIN_2, LOW);
-  digitalWrite(LED_PIN_3, LOW);
-
-  buttonState = digitalRead(4);
-
-  // check if the pushbutton is pressed. If it is, the buttonState is HIGH:
-  if (buttonState == HIGH) {    
-    digitalWrite(LED_PIN_1, HIGH);
-      digitalWrite(LED_PIN_2, HIGH);
-  digitalWrite(LED_PIN_3, HIGH);
-  pinMode(3, OUTPUT);
-    tone(3,550);
-
-  } else {
-digitalWrite(LED_PIN_1, LOW);
-  digitalWrite(LED_PIN_2, LOW);
-  digitalWrite(LED_PIN_3, LOW);
-// noTone(3);
-pinMode(3, INPUT);
-// digitalWrite(3, HIGH);
-  }
+  checkButton();
+  checkThresholds();
 
   for (int i = 0; i < 30; i++) {
     checkCAN();
   }
+
   updateAnalogData();
   sendViaBluetooth();
   drawDisplays();
 }
-
-
-
 
 
 #define BUFFER_SIZE 51
@@ -186,8 +180,8 @@ void updateAnalogData() {
   tempData2[19] = int(oilTemperature * 100) & 0xFF;
 }
 
-
-
+uint8_t found[4];
+long found_c[4];
 
 long previousMillis = 0;
 long val = 0;
@@ -198,40 +192,48 @@ void sendViaBluetooth() {
 
   if (central) {
     while (central.connected()) {
+      found[0] = 0;
+      found[1] = 0;
+      found[2] = 0;
+      found[3] = 0;
       long start = micros();
-
-      for (i = 0; i < 12; i++) {
+      for (i = 0; i < 50; i++) {
         checkCAN();
+        delayMicroseconds(20);
       }
-
-      ((uint32_t *)tempData)[0] = 0x0000ff01;
-      canBusMainCharacteristic.writeValue(tempData, 20, false);
-      long start2 = micros();
-
-      for (i = 0; i < 10; i++) {
-        checkCAN();
+      for (i = 0; i < 4; i++) {
+        found_c[i] += found[i];
       }
-      updateAnalogData();
-
-      ((uint32_t *)tempData2)[0] = 0x0000ff02;
-      canBusMainCharacteristic.writeValue(tempData2, 20, false);
-      long start3 = micros();
-
-      drawDisplays();
 
       if (micros() % 10 == 0) {
         Serial.print(micros() - start);
         Serial.print(" ");
-        Serial.print(start2 - start);
-        Serial.print(" ");
-        Serial.print(start3 - start2);
-        Serial.print(" ");
-        Serial.println(micros() - start3);
+        for (i = 0; i < 4; i++) {
+          Serial.print(found_c[i]);
+          Serial.print(" ");
+        }
+        Serial.println();
       }
+
+      ((uint32_t *)tempData)[0] = 0x0000ff01;
+      canBusMainCharacteristic.writeValue(tempData, 20, false);
+
+      for (i = 0; i < 20; i++) {
+        checkCAN();
+      }
+
+      updateAnalogData();
+
+      ((uint32_t *)tempData2)[0] = 0x0000ff02;
+      canBusMainCharacteristic.writeValue(tempData2, 20, false);
+
+      checkButton();
+      checkThresholds();
+
+      drawDisplays();
     }
   }
 }
-
 
 bool needAsk = true;
 long askTime = 0;
@@ -276,6 +278,7 @@ double afr = 0.0;
 double intakeAirTemperature = 0.0;
 double coolantTemperature = 0.0;
 
+
 void checkCAN() {
   if (CAN.available()) {
     CanMsg const msg = CAN.read();
@@ -284,6 +287,7 @@ void checkCAN() {
       case 0x81:
         tempData[4] = msg.data[2];  // 0081	2-3 (BE)	0xFFFF	Steering angle (FDE1 to 021E)	    bytesToInt (2, 2)
         tempData[5] = msg.data[3];
+        found[0] = 1;
         break;
       case 0x201:
         tempData[6] = msg.data[0];  // 0201	0-1 (BE)	0xFFFF	RPM * 4	                          bytesToUint(0, 2)/4
@@ -291,9 +295,11 @@ void checkCAN() {
         tempData[8] = msg.data[4];  // 0201	4-5 (BE)	0xFFFF	Vehicle speed kph * 100 + 10000	 (bytesToUint(4, 2)-10000)/360
         tempData[9] = msg.data[5];
         tempData[10] = msg.data[6];  // 0201	6	0xFF	Throttle % * 2	                            bytesToUint(6, 1)/2
+        found[1] = 1;
         break;
       case 0x212:
         tempData[11] = msg.data[5];  // 0212	5	0x8	Brake on	  0001000                                  bitsToUint (44,1)*100
+        found[2] = 1;
         break;
       case 0x4B0:
         tempData[12] = msg.data[0];  // 04B0	0-1 (BE)	0xFFFF	LF wheel kph * 100 + 10000	     (bytesToUint(0, 2)-10000)/360
@@ -304,6 +310,7 @@ void checkCAN() {
         tempData[17] = msg.data[5];
         tempData[18] = msg.data[6];  // 04B0	6-7 (BE)	0xFFFF	RR wheel kph * 100 + 10000	     (bytesToUint(6, 2)-10000)/360
         tempData[19] = msg.data[7];
+        found[3] = 1;
         break;
       case 0x420:
         tempData2[4] = msg.data[0];  // 0420  0 Coolant + 40                                      bytesToUint(0, 1)-40
@@ -339,6 +346,39 @@ void checkCAN() {
           }
         }
     }
+  }
+}
+
+void checkThresholds(void) {
+  if (coolantTemperature < 50 && oilTemperature < 115) {
+    digitalWrite(LED_PIN_RED, LOW);
+    digitalWrite(LED_PIN_YELLOW, HIGH);
+    digitalWrite(LED_PIN_GREEN, LOW);
+    pinMode(3, INPUT);
+  }
+
+  if (coolantTemperature > 50 && coolantTemperature < 60 && oilTemperature < 115) {
+    digitalWrite(LED_PIN_RED, LOW);
+    digitalWrite(LED_PIN_YELLOW, LOW);
+    digitalWrite(LED_PIN_GREEN, HIGH);
+    pinMode(3, INPUT);
+  }
+
+  if (coolantTemperature > 60 && coolantTemperature < 115 && oilTemperature < 115) {
+    digitalWrite(LED_PIN_RED, LOW);
+    digitalWrite(LED_PIN_YELLOW, LOW);
+    digitalWrite(LED_PIN_GREEN, LOW);
+    pinMode(3, INPUT);
+  }
+
+  if (coolantTemperature > 115 || oilTemperature > 110) {
+    digitalWrite(LED_PIN_RED, HIGH);
+    digitalWrite(LED_PIN_YELLOW, LOW);
+    digitalWrite(LED_PIN_GREEN, LOW);
+  }
+
+  if (coolantTemperature > 120 || oilTemperature > 115) {
+    tone(3, 550);
   }
 }
 
@@ -379,183 +419,218 @@ char buffer[10];
 void drawDisplays(void) {
   switch (state) {
     case 0:
-      u8g2.clearBuffer();
-      u8g2.setCursor(0, 32);
-      u8g2.setFont(u8g2_font_logisoso22_tn);
-      dtostrf(oilTemperature, -5, 1, buffer);
-      u8g2.print(buffer);
+      u8g2->clearBuffer();
 
-      u8g2.setCursor(0, 7);
-      u8g2.setFont(u8g2_font_6x10_tf);
-      u8g2.print("OIL T");
+      if (mode == 0) {
+        u8g2->setCursor(0, 32);
+        u8g2->setFont(u8g2_font_logisoso22_tn);
+        dtostrf(oilTemperature, -5, 1, buffer);
+        u8g2->print(buffer);
 
-      u8g2.updateDisplayArea(0, 0, 8, 1);
+        u8g2->setCursor(0, 7);
+        u8g2->setFont(u8g2_font_6x10_tf);
+        u8g2->print("OIL T");
+      } else {
+        u8g2->setCursor(20, 64);
+        u8g2->setFont(u8g2_font_logisoso54_tn);
+        dtostrf(oilTemperature, 3, 0, buffer);
+        u8g2->print(buffer);
+
+        u8g2->setCursor(0, 7);
+        u8g2->setFont(u8g2_font_6x10_tf);
+        u8g2->print("OIL TEMP");
+      }
+
+      u8g2->updateDisplayArea(0, 0, 8, 1);
       break;
     case 1:
-      u8g2.updateDisplayArea(0, 1, 8, 1);
+      u8g2->updateDisplayArea(0, 1, 8, 1);
       break;
     case 2:
-      u8g2.updateDisplayArea(0, 2, 8, 1);
+      u8g2->updateDisplayArea(0, 2, 8, 1);
       break;
     case 3:
-      u8g2.updateDisplayArea(0, 3, 8, 1);
+      u8g2->updateDisplayArea(0, 3, 8, 1);
       break;
 
     case 4:
-      u8g2.setCursor(86, 32);
-      u8g2.setFont(u8g2_font_logisoso22_tn);
-      dtostrf(coolantTemperature, 3, 0, buffer);
-      u8g2.print(buffer);
+      if (mode == 0) {
+        u8g2->setCursor(86, 32);
+        u8g2->setFont(u8g2_font_logisoso22_tn);
+        dtostrf(coolantTemperature, 3, 0, buffer);
+        u8g2->print(buffer);
 
-      u8g2.setCursor(87, 7);
-      u8g2.setFont(u8g2_font_6x10_tf);
-      u8g2.print("COOLANT");
+        u8g2->setCursor(87, 7);
+        u8g2->setFont(u8g2_font_6x10_tf);
+        u8g2->print("WATER T");
+      }
 
-      u8g2.updateDisplayArea(8, 0, 8, 1);
+      u8g2->updateDisplayArea(8, 0, 8, 1);
       break;
     case 5:
-      u8g2.updateDisplayArea(8, 1, 8, 1);
+      u8g2->updateDisplayArea(8, 1, 8, 1);
       break;
     case 6:
-      u8g2.updateDisplayArea(8, 2, 8, 1);
+      u8g2->updateDisplayArea(8, 2, 8, 1);
       break;
     case 7:
-      u8g2.updateDisplayArea(8, 3, 8, 1);
+      u8g2->updateDisplayArea(8, 3, 8, 1);
       break;
 
     case 8:
-      u8g2.setCursor(0, 56);
-      u8g2.setFont(u8g2_font_logisoso22_tn);
-      dtostrf(oilPressure, 3, 1, buffer);
-      u8g2.print(buffer);
+      if (mode == 0) {
+        u8g2->setCursor(0, 56);
+        u8g2->setFont(u8g2_font_logisoso22_tn);
+        dtostrf(oilPressure, 3, 1, buffer);
+        u8g2->print(buffer);
 
-      u8g2.setCursor(0, 64);
-      u8g2.setFont(u8g2_font_6x10_tf);
-      u8g2.print("OIL P");
+        u8g2->setCursor(0, 64);
+        u8g2->setFont(u8g2_font_6x10_tf);
+        u8g2->print("OIL P");
+      }
 
-      u8g2.updateDisplayArea(0, 4, 8, 1);
+      u8g2->updateDisplayArea(0, 4, 8, 1);
       break;
     case 9:
-      u8g2.updateDisplayArea(0, 5, 8, 1);
+      u8g2->updateDisplayArea(0, 5, 8, 1);
       break;
     case 10:
-      u8g2.updateDisplayArea(0, 6, 8, 1);
+      u8g2->updateDisplayArea(0, 6, 8, 1);
       break;
     case 11:
-      u8g2.updateDisplayArea(0, 7, 8, 1);
+      u8g2->updateDisplayArea(0, 7, 8, 1);
       askCanOBD();
       break;
 
     case 12:
-      u8g2.setCursor(86, 56);
-      u8g2.setFont(u8g2_font_logisoso22_tn);
-      dtostrf(intakeAirTemperature, 3, 0, buffer);
-      u8g2.print(buffer);
+      if (mode == 0) {
+        u8g2->setCursor(86, 56);
+        u8g2->setFont(u8g2_font_logisoso22_tn);
+        dtostrf(intakeAirTemperature, 3, 0, buffer);
+        u8g2->print(buffer);
 
-      u8g2.setCursor(94, 64);
-      u8g2.setFont(u8g2_font_6x10_tf);
-      u8g2.print("INTAKE");
+        u8g2->setCursor(94, 64);
+        u8g2->setFont(u8g2_font_6x10_tf);
+        u8g2->print("INTAKE");
+      }
 
-      u8g2.updateDisplayArea(8, 4, 8, 1);
+      u8g2->updateDisplayArea(8, 4, 8, 1);
       break;
     case 13:
-      u8g2.updateDisplayArea(8, 5, 8, 1);
+      u8g2->updateDisplayArea(8, 5, 8, 1);
       break;
     case 14:
-      u8g2.updateDisplayArea(8, 6, 8, 1);
+      u8g2->updateDisplayArea(8, 6, 8, 1);
       break;
     case 15:
-      u8g2.updateDisplayArea(8, 7, 8, 1);
+      u8g2->updateDisplayArea(8, 7, 8, 1);
       askCanOBD();
       break;
 
     case 16:
-      u8g2_2.clearBuffer();
-      u8g2_2.setCursor(0, 32);
-      u8g2_2.setFont(u8g2_font_logisoso22_tn);
-      u8g2_2.print(voltage, 1);
+      u8g2_2->clearBuffer();
 
-      u8g2_2.setCursor(0, 7);
-      u8g2_2.setFont(u8g2_font_6x10_tf);
-      u8g2_2.print("VOLT");
+      if (mode == 0) {
+        u8g2_2->setCursor(0, 32);
+        u8g2_2->setFont(u8g2_font_logisoso22_tn);
+        u8g2_2->print(voltage, 1);
+        u8g2_2->setCursor(0, 7);
+        u8g2_2->setFont(u8g2_font_6x10_tf);
+        u8g2_2->print("VOLT");
+      } else {
+        u8g2_2->setCursor(20, 64);
+        u8g2_2->setFont(u8g2_font_logisoso54_tn);
+        dtostrf(coolantTemperature, 3, 0, buffer);
+        u8g2_2->print(buffer);
 
-      u8g2_2.updateDisplayArea(0, 0, 8, 1);
+        u8g2_2->setCursor(0, 7);
+        u8g2_2->setFont(u8g2_font_6x10_tf);
+        u8g2_2->print("WATER TEMP");
+      }
+
+      u8g2_2->updateDisplayArea(0, 0, 8, 1);
       break;
     case 17:
-      u8g2_2.updateDisplayArea(0, 1, 8, 1);
+      u8g2_2->updateDisplayArea(0, 1, 8, 1);
       break;
     case 18:
-      u8g2_2.updateDisplayArea(0, 2, 8, 1);
+      u8g2_2->updateDisplayArea(0, 2, 8, 1);
       break;
     case 19:
-      u8g2_2.updateDisplayArea(0, 3, 8, 1);
+      u8g2_2->updateDisplayArea(0, 3, 8, 1);
       askCanOBD();
       break;
 
     case 20:
-      u8g2_2.setCursor(86, 32);
-      u8g2_2.setFont(u8g2_font_logisoso22_tn);
-      dtostrf(egt, 3, 0, buffer);
-      u8g2_2.print(buffer);
+      if (mode == 0) {
+        u8g2_2->setCursor(86, 32);
+        u8g2_2->setFont(u8g2_font_logisoso22_tn);
+        dtostrf(egt, 3, 0, buffer);
+        u8g2_2->print(buffer);
 
-      u8g2_2.setCursor(110, 7);
-      u8g2_2.setFont(u8g2_font_6x10_tf);
-      u8g2_2.print("EGT");
+        u8g2_2->setCursor(110, 7);
+        u8g2_2->setFont(u8g2_font_6x10_tf);
+        u8g2_2->print("EGT");
+      }
 
-      u8g2_2.updateDisplayArea(8, 0, 8, 1);
+      u8g2_2->updateDisplayArea(8, 0, 8, 1);
       break;
     case 21:
-      u8g2_2.updateDisplayArea(8, 1, 8, 1);
+      u8g2_2->updateDisplayArea(8, 1, 8, 1);
       break;
     case 22:
-      u8g2_2.updateDisplayArea(8, 2, 8, 1);
+      u8g2_2->updateDisplayArea(8, 2, 8, 1);
       break;
     case 23:
-      u8g2_2.updateDisplayArea(8, 3, 8, 1);
+      u8g2_2->updateDisplayArea(8, 3, 8, 1);
       askCanOBD();
       break;
     case 24:
-      u8g2_2.setCursor(0, 56);
-      u8g2_2.setFont(u8g2_font_logisoso22_tn);
-      u8g2_2.print(mafAirFlowRatio, 2);
+      if (mode == 0) {
+        u8g2_2->setCursor(0, 56);
+        u8g2_2->setFont(u8g2_font_logisoso22_tn);
+        u8g2_2->print(mafAirFlowRatio, 2);
 
-      u8g2_2.setCursor(0, 64);
-      u8g2_2.setFont(u8g2_font_6x10_tf);
-      u8g2_2.print("MAF");
+        u8g2_2->setCursor(0, 64);
+        u8g2_2->setFont(u8g2_font_6x10_tf);
+        u8g2_2->print("MAF");
+      }
 
-      u8g2_2.updateDisplayArea(0, 4, 8, 1);
+      u8g2_2->updateDisplayArea(0, 4, 8, 1);
       break;
     case 25:
-      u8g2_2.updateDisplayArea(0, 5, 8, 1);
+      u8g2_2->updateDisplayArea(0, 5, 8, 1);
       break;
     case 26:
-      u8g2_2.updateDisplayArea(0, 6, 8, 1);
+      u8g2_2->updateDisplayArea(0, 6, 8, 1);
       break;
     case 27:
-      u8g2_2.updateDisplayArea(0, 7, 8, 1);
+      u8g2_2->updateDisplayArea(0, 7, 8, 1);
       askCanOBD();
       break;
 
     case 28:
-      u8g2_2.setCursor(64, 56);
-      u8g2_2.setFont(u8g2_font_logisoso22_tn);
-      dtostrf(afr, 5, 1, buffer);
-      u8g2_2.print(buffer);
+      if (mode == 0) {
+        u8g2_2->setCursor(64, 56);
+        u8g2_2->setFont(u8g2_font_logisoso22_tn);
+        dtostrf(afr, 5, 1, buffer);
+        u8g2_2->print(buffer);
 
-      u8g2_2.setCursor(110, 64);
-      u8g2_2.setFont(u8g2_font_6x10_tf);
-      u8g2_2.print("AFR");
+        u8g2_2->setCursor(110, 64);
+        u8g2_2->setFont(u8g2_font_6x10_tf);
+        u8g2_2->print("AFR");
+      }
 
-      u8g2_2.updateDisplayArea(8, 4, 8, 1);
+      u8g2_2->updateDisplayArea(8, 4, 8, 1);
       break;
     case 29:
-      u8g2_2.updateDisplayArea(8, 5, 8, 1);
+      u8g2_2->updateDisplayArea(8, 5, 8, 1);
       break;
     case 30:
-      u8g2_2.updateDisplayArea(8, 6, 8, 1);
+      u8g2_2->updateDisplayArea(8, 6, 8, 1);
       break;
     case 31:
-      u8g2_2.updateDisplayArea(8, 7, 8, 1);
+      u8g2_2->updateDisplayArea(8, 7, 8, 1);
       state = -1;
       break;
   }
