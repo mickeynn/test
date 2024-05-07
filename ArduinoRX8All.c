@@ -205,7 +205,7 @@ void sendViaBluetooth() {
         found_c[i] += found[i];
       }
 
-      if (micros() % 10 == 0) {
+      if (false && micros() % 10 == 0) {
         Serial.print(micros() - start);
         Serial.print(" ");
         for (i = 0; i < 4; i++) {
@@ -350,38 +350,44 @@ void checkCAN() {
 }
 
 void checkThresholds(void) {
-  if (coolantTemperature < 50 && oilTemperature < 115) {
+  if (coolantTemperature < 50 && oilTemperature < 110) {
     digitalWrite(LED_PIN_RED, LOW);
     digitalWrite(LED_PIN_YELLOW, HIGH);
     digitalWrite(LED_PIN_GREEN, LOW);
-    pinMode(3, INPUT);
   }
 
-  if (coolantTemperature > 50 && coolantTemperature < 60 && oilTemperature < 115) {
+  if (coolantTemperature > 50 && coolantTemperature < 60 && oilTemperature < 110) {
     digitalWrite(LED_PIN_RED, LOW);
     digitalWrite(LED_PIN_YELLOW, LOW);
     digitalWrite(LED_PIN_GREEN, HIGH);
-    pinMode(3, INPUT);
   }
 
-  if (coolantTemperature > 60 && coolantTemperature < 115 && oilTemperature < 115) {
+  if (coolantTemperature > 60 && coolantTemperature < 102 && oilTemperature < 102) {
     digitalWrite(LED_PIN_RED, LOW);
     digitalWrite(LED_PIN_YELLOW, LOW);
     digitalWrite(LED_PIN_GREEN, LOW);
-    pinMode(3, INPUT);
   }
 
-  if (coolantTemperature > 115 || oilTemperature > 110) {
-    digitalWrite(LED_PIN_RED, HIGH);
-    digitalWrite(LED_PIN_YELLOW, LOW);
+  if (coolantTemperature >= 102 && coolantTemperature < 107 && oilTemperature < 107) {
+    digitalWrite(LED_PIN_RED, LOW);
+    digitalWrite(LED_PIN_YELLOW, HIGH);
     digitalWrite(LED_PIN_GREEN, LOW);
   }
 
-  if (coolantTemperature > 120 || oilTemperature > 115) {
+  if (coolantTemperature >= 107 || oilTemperature >= 107) {
+    digitalWrite(LED_PIN_RED, HIGH);
+    digitalWrite(LED_PIN_YELLOW, HIGH);
+    digitalWrite(LED_PIN_GREEN, LOW);
+  }
+
+  if (coolantTemperature < 108 && oilTemperature < 108) {
+    pinMode(3, INPUT);
+  }
+
+  if (coolantTemperature > 110 || oilTemperature > 110) {
     tone(3, 550);
   }
 }
-
 
 
 long state = 0;
@@ -431,14 +437,17 @@ void drawDisplays(void) {
         u8g2->setFont(u8g2_font_6x10_tf);
         u8g2->print("OIL T");
       } else {
-        u8g2->setCursor(20, 64);
-        u8g2->setFont(u8g2_font_logisoso54_tn);
+        u8g2->setCursor(12, 64);
+        u8g2->setFont(u8g2_font_logisoso62_tn);
         dtostrf(oilTemperature, 3, 0, buffer);
         u8g2->print(buffer);
 
-        u8g2->setCursor(0, 7);
-        u8g2->setFont(u8g2_font_6x10_tf);
-        u8g2->print("OIL TEMP");
+
+        u8g2->setFontDirection(3);
+        u8g2->setCursor(14, 61);
+        u8g2->setFont(u8g2_font_UnnamedDOSFontIV_tr);  //u8g2_font_6x10_tf
+        u8g2->print("OIL");
+        u8g2->setFontDirection(0);
       }
 
       u8g2->updateDisplayArea(0, 0, 8, 1);
@@ -538,14 +547,16 @@ void drawDisplays(void) {
         u8g2_2->setFont(u8g2_font_6x10_tf);
         u8g2_2->print("VOLT");
       } else {
-        u8g2_2->setCursor(20, 64);
-        u8g2_2->setFont(u8g2_font_logisoso54_tn);
+        u8g2_2->setCursor(12, 64);
+        u8g2_2->setFont(u8g2_font_logisoso62_tn);
         dtostrf(coolantTemperature, 3, 0, buffer);
         u8g2_2->print(buffer);
 
-        u8g2_2->setCursor(0, 7);
-        u8g2_2->setFont(u8g2_font_6x10_tf);
-        u8g2_2->print("WATER TEMP");
+        u8g2_2->setFontDirection(3);
+        u8g2_2->setCursor(14, 61);
+        u8g2_2->setFont(u8g2_font_UnnamedDOSFontIV_tr);  //u8g2_font_6x10_tf
+        u8g2_2->print("WATER");
+        u8g2_2->setFontDirection(0);
       }
 
       u8g2_2->updateDisplayArea(0, 0, 8, 1);
