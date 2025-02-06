@@ -318,6 +318,7 @@ void checkCAN() {
         break;
       default:
         if (msg.data[1] == 0x41) {
+          long afr_tmp;
           switch (msg.data[2]) {
             case 0x10:
               tempData2[5] = msg.data[3];
@@ -338,6 +339,13 @@ void checkCAN() {
               tempData2[11] = msg.data[3];
               tempData2[12] = msg.data[4];
               afr = (2.0 * (msg.data[3] * 256.0 + msg.data[4]) / 65536.0) * 14.6412885;
+              break;
+            case 0x2f:
+              afr_tmp = msg.data[3] / 255.0 / 2.0 * 65536;
+              tempData2[11] = (afr_tmp >> 8) & 0xff;
+              tempData2[12] = afr_tmp & 0xff;
+
+              afr = msg.data[3] / 2.55;
               break;
             case 0xf:
               tempData2[13] = msg.data[3];
@@ -410,6 +418,7 @@ void askCanOBD() {
       break;
     case 27:
       pid = 0x44;  // AFR
+      // pid = 0x2f;  // FUEL_TANK_LEVEL_INPUT
       break;
   }
 
